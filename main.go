@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"time"
 
 	"brunocascio/docker-swarm-network-attacher/lib"
 
@@ -20,25 +21,14 @@ func main() {
 
 	log.Printf("Connected to docker endpoint %s (version %s)", cli.DaemonHost(), cli.ClientVersion())
 
-	listeners, err := lib.GetListeners(cli, ctx)
+	done := make(chan bool)
+	go forever(cli, ctx)
+	<-done // Block forever
+}
 
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	targets, err := lib.GetTargets(cli, ctx)
-
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	for _, listener := range listeners {
-
-		listener_ignore_networks := lib.GetListenerIgnoreNetworks(cli, ctx, listener)
-		listener_targets_networks := lib.GetListenerTargetsNetworks(cli, ctx, listener, targets)
-
-		networks_to_update := append(listener_ignore_networks, listener_targets_networks...)
-
-		lib.UpdateListenerNetworks(cli, ctx, listener, networks_to_update)
+func forever(cli *client.Client, ctx context.Context) {
+	for {
+		lib.Start(cli, ctx)
+		time.Sleep(time.Second * 10)
 	}
 }

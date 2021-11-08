@@ -12,6 +12,30 @@ import (
 	"github.com/thoas/go-funk"
 )
 
+func Start(cli *client.Client, ctx context.Context) {
+	listeners, err := GetListeners(cli, ctx)
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	targets, err := GetTargets(cli, ctx)
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	for _, listener := range listeners {
+
+		listener_ignore_networks := GetListenerIgnoreNetworks(cli, ctx, listener)
+		listener_targets_networks := GetListenerTargetsNetworks(cli, ctx, listener, targets)
+
+		networks_to_update := append(listener_ignore_networks, listener_targets_networks...)
+
+		UpdateListenerNetworks(cli, ctx, listener, networks_to_update)
+	}
+}
+
 func GetListeners(cli *client.Client, ctx context.Context) ([]swarm.Service, error) {
 	return cli.ServiceList(ctx, types.ServiceListOptions{Filters: filters.NewArgs(filters.KeyValuePair{
 		Key:   "label",
