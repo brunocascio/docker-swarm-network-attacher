@@ -1,11 +1,10 @@
-FROM golang:1.16-buster AS build
+FROM golang:1.16-alpine AS build
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN go build -o /app/dsna
 
-FROM gcr.io/distroless/base-debian10
+FROM alpine
 COPY --from=build /app/dsna /dsna
-USER nonroot:nonroot
 ENTRYPOINT ["/dsna"]
