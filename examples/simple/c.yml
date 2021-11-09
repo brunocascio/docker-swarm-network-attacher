@@ -13,5 +13,5 @@ services:
       - a_c_network
     deploy:
       labels:
-        - dsna.connections=simple-a_service
-        - dsna.connections.simple-a_service.network=a_c_network
+        - dsna.connections=simple-a_service                     # this service will have a point-to-point network with simple-a_service
+        - dsna.connections.simple-a_service.network=a_c_network # specify the network name to use for point-to-point communication
