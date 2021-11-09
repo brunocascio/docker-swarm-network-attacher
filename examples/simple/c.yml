@@ -1,0 +1,17 @@
+version: "3.9"
+
+networks:
+  a_c_network:
+    name: "a_c_network"
+
+services:
+
+  service:
+    image: nginx:stable-alpine
+    networks:
+      - default
+      - a_c_network
+    deploy:
+      labels:
+        - dsna.connections=simple-a_service
+        - dsna.connections.simple-a_service.network=a_c_network

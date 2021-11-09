@@ -4,3 +4,4 @@ tmp
 *.md
 Dockerfile*
 Makefile
+examples

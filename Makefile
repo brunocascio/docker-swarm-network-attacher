@@ -8,3 +8,12 @@ dev:
 
 build:
 	@docker build -t dsna .
+
+examples-simple:
+	@docker stack deploy --prune --resolve-image=changed -c examples/simple/a.yml simple-a
+	@docker stack deploy --prune --resolve-image=changed -c examples/simple/b.yml simple-b
+	@docker stack deploy --prune --resolve-image=changed -c examples/simple/c.yml simple-c
+	@docker stack deploy --prune --resolve-image=changed -c examples/simple/d.yml simple-d
+
+examples-clean:
+	@docker stack rm simple-{a,b,c,d}

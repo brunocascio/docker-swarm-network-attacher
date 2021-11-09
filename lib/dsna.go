@@ -12,92 +12,92 @@ import (
 	"github.com/thoas/go-funk"
 )
 
+type Connection struct {
+	connection_name string
+	network_name    string
+}
+
 func Start(cli *client.Client, ctx context.Context) {
-	listeners, err := GetListeners(cli, ctx)
+
+	connections, err := GetConnections(cli, ctx)
 
 	if err != nil {
 		log.Fatalln(err)
+		return
 	}
 
-	targets, err := GetTargets(cli, ctx)
+	hydrated_connections := HydrateConnections(cli, ctx, connections)
 
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	for _, listener := range listeners {
-
-		listener_ignore_networks := GetListenerIgnoreNetworks(cli, ctx, listener)
-		listener_targets_networks := GetListenerTargetsNetworks(cli, ctx, listener, targets)
-
-		networks_to_update := append(listener_ignore_networks, listener_targets_networks...)
-
-		UpdateListenerNetworks(cli, ctx, listener, networks_to_update)
-	}
-}
-
-func GetListeners(cli *client.Client, ctx context.Context) ([]swarm.Service, error) {
-	return cli.ServiceList(ctx, types.ServiceListOptions{Filters: filters.NewArgs(filters.KeyValuePair{
-		Key:   "label",
-		Value: "dsna.listener",
-	})})
-}
-
-func GetTargets(cli *client.Client, ctx context.Context) ([]swarm.Service, error) {
-	return cli.ServiceList(ctx, types.ServiceListOptions{Filters: filters.NewArgs(filters.KeyValuePair{
-		Key:   "label",
-		Value: "dsna.enable=true",
-	})})
-}
-
-func UpdateListenerNetworks(cli *client.Client, ctx context.Context, listener swarm.Service, networks []string) (types.ServiceUpdateResponse, error) {
-	networks_to_attach := funk.Map(networks, func(n string) swarm.NetworkAttachmentConfig {
-		return swarm.NetworkAttachmentConfig{Target: n}
-	})
-
-	listener.Spec.TaskTemplate.Networks = networks_to_attach.([]swarm.NetworkAttachmentConfig)
-
-	return cli.ServiceUpdate(ctx, listener.ID, listener.Version, listener.Spec, types.ServiceUpdateOptions{})
-}
-
-func GetListenerIgnoreNetworks(cli *client.Client, ctx context.Context, listener swarm.Service) []string {
-	ignored_networks := strings.Split(strings.ReplaceAll(listener.Spec.Labels["dsna.listener.ignore-networks"], " ", ""), ",")
-	var network_ids []string
-	for _, n := range ignored_networks {
-		network, err := cli.NetworkInspect(ctx, n, types.NetworkInspectOptions{})
+	for connection, networks := range hydrated_connections {
+		err := UpdateConnectionNetworks(cli, ctx, connection, networks)
 		if err != nil {
-			log.Fatal(err)
-			panic(err)
+			log.Fatalln(err)
 		}
-		network_ids = append(network_ids, network.ID)
 	}
-	return network_ids
 }
 
-func GetListenerTargetsNetworks(cli *client.Client, ctx context.Context, listener swarm.Service, targets []swarm.Service) []string {
-	listener_name := listener.Spec.Name
+func UpdateConnectionNetworks(cli *client.Client, ctx context.Context, connection string, networks []string) error {
+	var changed = false
+	service, _, err := cli.ServiceInspectWithRaw(ctx, connection, types.ServiceInspectOptions{})
+	if err != nil {
+		return err
+	}
+	current_svc_networks := funk.Get(service.Spec.TaskTemplate.Networks, "Target")
+	funk.ForEach(networks, func(net string) {
+		if !funk.Contains(current_svc_networks, net) {
+			changed = true
+			service.Spec.TaskTemplate.Networks = append(service.Spec.TaskTemplate.Networks, swarm.NetworkAttachmentConfig{Target: net})
+		}
+	})
+	if changed {
+		log.Printf("Updating service %s with networks %s", service.Spec.Name, service.Spec.TaskTemplate.Networks)
+	}
+	r, err := cli.ServiceUpdate(ctx, service.ID, service.Version, service.Spec, types.ServiceUpdateOptions{})
+	_ = r
+	return err
+}
 
-	var network_ids []string
-
-	for _, target := range targets {
-		// remove whitespaces and convert sintrg into array
-		target_listeners := strings.Split(strings.ReplaceAll(target.Spec.Labels["dsna.listeners"], " ", ""), ",")
-		if !funk.Contains(target_listeners, listener_name) {
-			// skip target since it's not related to the current listener
+func HydrateConnections(cli *client.Client, ctx context.Context, connections []Connection) map[string][]string {
+	var dict = make(map[string][]string)
+	for _, connection := range connections {
+		connection_obj, _, err := cli.ServiceInspectWithRaw(ctx, connection.connection_name, types.ServiceInspectOptions{})
+		if err != nil {
+			log.Fatalln(err)
 			continue
 		}
-
-		target_network := target.Spec.Labels["dsna.listeners."+listener_name+".network"]
-
-		network, err := cli.NetworkInspect(ctx, target_network, types.NetworkInspectOptions{})
-
+		network_obj, err := cli.NetworkInspect(ctx, connection.network_name, types.NetworkInspectOptions{})
 		if err != nil {
-			log.Fatal(err)
-			panic(err)
+			log.Fatalln(err)
+			continue
 		}
+		dict[connection_obj.ID] = append(dict[connection_obj.ID], network_obj.ID)
+	}
+	return dict
+}
 
-		network_ids = append(network_ids, network.ID)
+func GetConnections(cli *client.Client, ctx context.Context) ([]Connection, error) {
+	services, err := cli.ServiceList(ctx, types.ServiceListOptions{Filters: filters.NewArgs(filters.KeyValuePair{
+		Key:   "label",
+		Value: "dsna.connections",
+	})})
+
+	if err != nil {
+		return nil, err
 	}
 
-	return network_ids
+	var connections []Connection
+
+	for _, service := range services {
+		connection_names := strings.Split(service.Spec.Labels["dsna.connections"], ",")
+		for _, connection_name := range connection_names {
+			connection_name := strings.TrimSpace(connection_name)
+			network_name := service.Spec.Labels["dsna.connections."+connection_name+".network"]
+			connections = append(connections, Connection{
+				connection_name: connection_name,
+				network_name:    network_name,
+			})
+		}
+	}
+
+	return connections, nil
 }
