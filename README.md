@@ -2,9 +2,13 @@
 
 ## Description
 
-`docker-swarm-network-attacher` aims to solve the problem of sharing a network between unrelated services. 
+`docker-swarm-network-attacher` aims to solve the problem of sharing a network between unrelated containers. 
 With this service we can generate "point-to-point" networks and avoid this problem.
 
+**How it works**
+
+It basically fetch **containers** (not services) with label `"dsna.enabled=true"` and auto connect them to all the overlay networks available on the cluster.
+Under the hood it performs a `docker network connect` on every container to every network.
 ## How to deploy it
 
 ### Deploy dsna service
