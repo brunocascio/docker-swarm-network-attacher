@@ -29,6 +29,6 @@ func main() {
 func forever(cli *client.Client, ctx context.Context) {
 	for {
 		lib.Start(cli, ctx)
-		time.Sleep(time.Second * 10)
+		time.Sleep(time.Second * 5)
 	}
 }

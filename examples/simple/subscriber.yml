@@ -1,0 +1,8 @@
+version: "3.9"
+
+services:
+
+  service:
+    image: nginx:stable-alpine
+    labels:
+      - dsna.enable=true
