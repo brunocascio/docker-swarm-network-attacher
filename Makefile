@@ -2,6 +2,9 @@ dev:
 	docker build --target base -t dsna:local .
 	docker run --rm -ti -v "${PWD}:/app" -w /app -v /var/run/docker.sock:/var/run/docker.sock dsna:local
 
+dev-go:
+	@air
+
 build:
 	@docker build -t dsna .
 
