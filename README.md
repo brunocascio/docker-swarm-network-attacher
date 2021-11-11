@@ -1,4 +1,4 @@
-# Docker swarm network attacher
+# Docker swarm network attacher (POC)
 
 ## Description
 
